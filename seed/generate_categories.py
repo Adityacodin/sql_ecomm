@@ -7,13 +7,15 @@ def main():
     cur = conn.cursor()
     db.execute_query(
         cur,
-        """INSERT INTO categories (cateory_name) VALUES 
-        (''),
-        (),
-        (),
-        (),
-        ()
-        """)
+        """INSERT INTO categories (category_name) VALUES 
+        ('Sports & Fitness'),
+        ('Beauty & Personal Care'),
+        ('Toys & Games'),
+        ('Furniture'),
+        ('Luggage & Travel')
+    """)
+    db.save_changes(conn)
+    db.close_db(conn)
 
 
 if __name__ == "__main__":
