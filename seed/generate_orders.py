@@ -1,59 +1,111 @@
 import sys
-sys.path.append("../apps/")
+sys.path.append("../apps")
+
 import db
-from random import shuffle,randint
 from faker import Faker
+from random import shuffle, randint, choices
+
+def get_customer_ids(cur):
+    db.execute_query(
+    cur,
+    """
+    SELECT customer_id
+    FROM customers;
+    """
+    )
+    return [row[0] for row in cur.fetchall()]
+
+
+def create_order(cur, customer_id, faker):
+    order_date = faker.date_time_between(
+        start_date="-1y",
+        end_date="now"
+    )
+
+    status = choices(
+        population=[
+            "delivered",
+            "shipped",
+            "pending",
+            "returned",
+            "cancelled"
+        ],
+        weights=[
+            130,
+            50,
+            10,
+            8,
+            7
+        ],
+        k=1
+    )[0]
+
+    db.execute_query(
+        cur,
+        """
+        INSERT INTO orders
+        (
+            customer_id,
+            orderdate,
+            status,
+            total_amount
+        )
+        VALUES
+        (?,?,?,?);
+        """,
+        (
+            customer_id,
+            order_date,
+            status,
+            0
+        )
+    )
 
 def main():
     conn = db.connect_db()
     cur = conn.cursor()
-    db.execute_query(cur,"""
-        select customer_id from customers;
-    """)
-    ids = cur.fetchall()
-    shuffle(ids)
-    print(ids)
-    # vip = ids[0:20]
-    # vip_ord = randint(10,20)
-    # regular = ids[21:140]
-    # reg_ord = randint(2,6)
-    # inactive = ids[141:]
-    # in_ord = randint(0,2)
-    statuses = [
-    ('delivered', 85),
-    ('shipped', 10),
-    ('pending', 3),
-    ('returned', 1),
-    ('cancelled', 1)
-    ]
-    fk = Faker()
-    date_time = faker.date_time_between(
-    start_date="-1y",
-    end_date="now"
-    )
-    count = 0
-    orders = 0
-    for id in ids:
-        if count < 21:
-            order_n = randint(10,20)
-        elif count >= 21 and count < 141:
-            order_n = randint(2,6)
-        else :
-            order_n = randint(0,2)
-        
-        for ord in order_n:
-            date_time = faker.date_time_between(
-                start_date="-1y",
-                end_date="now"
-            )
-            db.execute_query(
-                cur,
-                """
-                INSERT INTO orders (customer_id,orderdate,status,total_amount) values 
-                (?,?,?,0)
-                """,(id[0],date_time,get_status())
-            )
-        
+
+    faker = Faker()
+
+    customer_ids = get_customer_ids(cur)
+
+    shuffle(customer_ids)
+
+    vip = customer_ids[:20]
+    regular = customer_ids[20:140]
+    inactive = customer_ids[140:]
+
+    total_orders = 0
+
+    for customer_id in vip:
+
+        num_orders = randint(8, 15)
+
+        for _ in range(num_orders):
+            create_order(cur, customer_id, faker)
+            total_orders += 1
+
+    for customer_id in regular:
+
+        num_orders = randint(2, 5)
+
+        for _ in range(num_orders):
+            create_order(cur, customer_id, faker)
+            total_orders += 1
+
+    for customer_id in inactive:
+
+        num_orders = randint(0, 2)
+
+        for _ in range(num_orders):
+            create_order(cur, customer_id, faker)
+            total_orders += 1
+
+    db.save_changes(conn)
+
+    print(f"{total_orders} orders inserted.")
+
+    db.close_db(conn)
 
 if __name__ == "__main__":
     main()
