@@ -79,4 +79,75 @@ FROM (
 ) as sq1;
 
 
+ 
+-- Rank categories by total revenue.
+SELECT *,
+	RANK() OVER(ORDER BY revenue DESC) as revenue_rank
+FROM (
+	SELECT c.category_id,c.category_name, SUM(oi.price_per_unit * oi.quantity) as revenue
+	from order_items oi
+	JOIN products p ON oi.product_id = p.product_id
+	JOIN categories c ON p.category_id = c.category_id
+	JOIN orders o ON oi.order_id = o.order_id
+	JOIN payments py ON o.order_id = py.order_id
+	WHERE py.payment_status = 'paid'
+	GROUP BY c.category_id,c.category_name
+) as sq1;
 
+-- top 3 selling product each category 
+with product_revenue as (
+	SELECT p.product_id,p.product_name,c.category_id,c.category_name, SUM(oi.price_per_unit * oi.quantity) as revenue
+	from order_items oi
+	JOIN products p ON oi.product_id = p.product_id
+	JOIN categories c ON p.category_id = c.category_id
+	JOIN orders o ON oi.order_id = o.order_id
+	JOIN payments py ON o.order_id = py.order_id
+	WHERE py.payment_status = 'paid'
+	GROUP BY p.product_id,p.product_name,c.category_id,c.category_name
+),
+ranked_products as (
+	SELECT *,	
+		DENSE_RANK() OVER(PARTITION BY category_id ORDER BY revenue) as rank
+	FROM product_revenue
+)
+SELECT * FROM
+ranked_products
+WHERE rank <= 3;
+
+-- top 2 customers in each city based on their spend
+WITH customers_spend as (
+SELECT  a.city,
+		c.customer_id,
+	CONCAT(c.first_name,' ',c.last_name) AS customer_name,
+	SUM(total_amount) as total_spent_on_orders
+	FROM
+	customers c
+	JOIN orders o ON c.customer_id = o.customer_id 
+	JOIN payments p ON o.order_id = p.order_id
+	JOIN addresses a ON c.customer_id  = a.customer_id 
+	WHERE p.payment_status = 'paid'
+	GROUP BY c.customer_id
+), customers_ranked as (
+	SELECT *,
+		DENSE_RANK() OVER(partition by city order by total_spent_on_orders DESC) as ranked
+	FROM customers_spend 
+)
+SELECT *
+FROM customers_ranked 
+WHERE ranked<=2;
+
+
+-- comparing each months revenue with previous month's
+WITH monthly_revenue as (
+	SELECT 
+			MONTHNAME(payment_date) as month,
+			DATE_FORMAT(payment_date,"%Y-%m") as month_year,
+			sum(amount) as revenue
+	FROM payments
+	WHERE payment_status = 'paid'
+	GROUP BY DATE_FORMAT(payment_date,"%Y-%m")
+),
+SELECT
+	LAG(revenue,1,1,0) OVER(PARTITION BY month_year) as prev_month 
+FROM monthly_revenue;
+	
