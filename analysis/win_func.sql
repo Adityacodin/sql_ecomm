@@ -78,8 +78,6 @@ FROM (
 	GROUP BY c.customer_id, customer_name
 ) as sq1;
 
-
- 
 -- Rank categories by total revenue.
 SELECT *,
 	RANK() OVER(ORDER BY revenue DESC) as revenue_rank
@@ -146,8 +144,202 @@ WITH monthly_revenue as (
 	FROM payments
 	WHERE payment_status = 'paid'
 	GROUP BY DATE_FORMAT(payment_date,"%Y-%m")
-),
+)
 SELECT
-	LAG(revenue,1,1,0) OVER(PARTITION BY month_year) as prev_month 
+    *,
+	LAG(revenue,1) OVER(ORDER BY month_year) as prev_month 
 FROM monthly_revenue;
+	
+	
+-- compare product sales with previous ones
+with product_wise_monthly_revenue as 
+( 
+Select 
+	DATE_FORMAT(o.orderdate,"%Y-%m") as month_year,
+	p.product_id,p.product_name,
+	p.category_id,sum(oi.quantity) as quantity,sum(oi.quantity * oi.price_per_unit) as product_revenue 
+From products p 
+JOIN order_items oi ON p.product_id = oi.product_id 
+JOIN orders o ON oi.order_id = o.order_id 
+JOIN payments py ON o.order_id = py.order_id 
+WHERE py.payment_status = 'paid' 
+GROUP BY month_year,p.product_id ),
+lag_window_func as (
+select *, 
+lag(quantity,1) over(partition by product_id order by month_year )as prev_month_quantity, 
+lag(product_revenue,1) over(partition by product_id order by month_year )as prev_month_revenue 
+from product_wise_monthly_revenue
+)
+SELECT * FROM lag_window_func where product_revenue < prev_month_revenue;
+
+
+-- each customer's order along with next order UPDATE e
+WITH customer_order_info AS (
+	SELECT 
+		c.customer_id, 
+		concat(c.first_name,' ',c.last_name) as customer_name,
+		o.order_id,
+		o.orderdate
+	FROM orders o
+	JOIN customers c ON o.customer_id = c.customer_id
+),
+lead_window as(
+	SELECT 
+		*, 
+		LEAD(orderdate,1) OVER(partition by customer_id ORDER BY orderdate) as next_order_date
+	FROM customer_order_info 
+)
+	SELECT 
+		*,
+		DATEDIFF(next_order_date,orderdate) as days_to_next_order
+	FROM lead_window;
+	
+	
+
+-- every customers order amount compared to their first order
+with cust_order_info as (
+	SELECT 
+		c.customer_id,
+		concat(c.first_name,' ',c.last_name) as customer_name,
+		o.order_id,
+		o.orderdate,
+		o.total_amount
+	FROM orders o
+	JOIN customers c ON o.customer_id = c.customer_id
+	GROUP BY o.order_id
+),
+f_val_func as (
+SELECT *,FIRST_VALUE(total_amount) OVER(PARTITION BY customer_id order by orderdate) as first_order_amount
+FROM cust_order_info
+)
+SELECT *,
+	total_amount - first_order_amount as amount_difference
+FROM f_val_func;
+
+ 
+-- complete opposite using last_value()
+with cust_order_info as (
+	SELECT 
+		c.customer_id,
+		concat(c.first_name,' ',c.last_name) as customer_name,
+		o.order_id,
+		o.orderdate,
+		o.total_amount
+	FROM orders o
+	JOIN customers c ON o.customer_id = c.customer_id
+	GROUP BY o.order_id
+),
+f_val_func as (
+SELECT *,LAST_VALUE(total_amount) OVER(PARTITION BY customer_id order by orderdate ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) as recent_order_amount
+FROM cust_order_info
+)
+SELECT *,
+	total_amount - recent_order_amount as amount_difference
+FROM f_val_func;
+
+
+-- each customers order amount compared with their average
+with cust_order_info as (
+	SELECT 
+		c.customer_id,
+		concat(c.first_name,' ',c.last_name) as customer_name,
+		o.order_id,
+		o.orderdate,
+		o.total_amount
+	FROM orders o
+	JOIN customers c ON o.customer_id = c.customer_id
+	GROUP BY o.order_id
+)
+SELECT 
+	customer_name,
+	order_id,
+	orderdate,
+	total_amount,
+	ROUND(AVG(total_amount) OVER(partition by customer_id),2) as customer_average
+FROM cust_order_info;
+
+WITH prod_cat_info AS (
+	SELECT 
+		p.product_id,
+		p.product_name,
+		p.price,
+		c.category_id
+	FROM products p 
+	JOIN categories c ON p.category_id  = c.category_id
+	GROUP BY p.product_id,p.product_name
+)
+SELECT 
+	product_id,
+	product_name,
+	price,
+	ROUND(AVG(price) OVER(PARTITION BY category_id),2) as avg_product_price_wrt_category
+FROM prod_cat_info;
+
+
+-- each order amount as a percentage of the customer's total spending
+with cust_order_info as (
+	SELECT 
+		c.customer_id,
+		concat(c.first_name,' ',c.last_name) as customer_name,
+		o.order_id,
+		o.total_amount
+	FROM orders o
+	JOIN customers c ON o.customer_id = c.customer_id
+	GROUP BY o.order_id	
+)
+SELECT *,
+	ROUND(total_amount*100.0 / SUM(total_amount) OVER(PARTITION BY customer_id),2) as percentage_contribution_to_total_spent
+FROM cust_order_info;
+	
+
+-- each month's revenue as a percentage of the total company revenue.
+WITH monthly_revenue as (
+	SELECT 
+			MONTHNAME(payment_date) as month,
+			DATE_FORMAT(payment_date,"%Y-%m") as month_year,
+			sum(amount) as revenue
+	FROM payments
+	WHERE payment_status = 'paid'
+	GROUP BY DATE_FORMAT(payment_date,"%Y-%m")
+)
+SELECT *,
+ROUND(revenue * 100.0 / SUM(revenue) OVER(),2) as percentage
+FROM monthly_revenue 
+ORDER BY month_year ASC;
+
+
+-- customers whose latest order is above their own average order value
+with cust_order_info as (
+	SELECT 
+		c.customer_id,
+		concat(c.first_name,' ',c.last_name) as customer_name,
+		o.order_id,
+		o.orderdate,
+		o.total_amount
+	FROM orders o
+	JOIN customers c ON o.customer_id = c.customer_id
+),
+row_avg_info as (
+	SELECT
+		order_id,
+		orderdate,
+		customer_id,
+		customer_name,
+		total_amount,
+		ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY orderdate DESC) as row_num,
+		ROUND(AVG(total_amount) OVER(PARTITION BY customer_id),2) as avg_order_value	
+	FROM cust_order_info
+)
+SELECT
+	order_id,
+	orderdate,
+	customer_id,
+	customer_name,
+	total_amount,
+	avg_order_value
+FROM row_avg_info 
+WHERE row_num = 1 AND total_amount > avg_order_value; 
+
+
+
 	
