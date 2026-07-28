@@ -340,6 +340,26 @@ SELECT
 FROM row_avg_info 
 WHERE row_num = 1 AND total_amount > avg_order_value; 
 
+-- sales information
+WITH prod_info AS (
+	SELECT 
+		p.product_id,
+		p.product_name,
+		SUM(oi.price_per_unit * oi.quantity) as revenue,
+		SUM(oi.quantity) as units_sold
+	FROM products p 
+	JOIN order_items oi ON p.product_id = oi.product_id
+	JOIN orders o ON oi.order_id = o.order_id
+	JOIN payments py ON o.order_id = py.order_id
+	WHERE py.payment_status = 'paid'
+	GROUP BY p.product_id,p.product_name
+)
+SELECT *,
+	RANK() OVER(ORDER BY revenue DESC) as revenue_rank,
+	SUM(revenue) OVER(ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as running_revenue
+FROM prod_info;
+
+
 
 
 	
