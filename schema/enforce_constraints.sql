@@ -8,10 +8,7 @@ desc customers;
 desc order_items;
 desc orders;
 
-
 alter table customers modify created_at datetime default now() not null;
-
-SHOW CREATE TABLE order_items;
 
 alter table order_items modify price_per_unit decimal(10,2) not null check(price_per_unit >= 0);
 
