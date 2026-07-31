@@ -4,87 +4,80 @@ use ecomm_db;
 
 CREATE TABLE customers(
 	customer_id int primary key auto_increment,
-	first_name varchar(25),
-	last_name varchar(25),
-	email varchar(50),
-	phone varchar(15),
-	created_at DATETIME DEFAULT NOW()
+	first_name varchar(25) not null,
+	last_name varchar(25) not null,
+	email varchar(50) not null UNIQUE,
+	phone varchar(15) not null UNIQUE ,
+	created_at DATETIME DEFAULT NOW() not null
 );
 
 ALTER TABLE customers AUTO_INCREMENT = 100;
 
 CREATE TABLE addresses (
 address_id int primary key auto_increment,
-customer_id int,
-city varchar(20),
-state varchar(20),
-country varchar(20),
-postal_code varchar(20),
-FOREIGN KEY (customer_id)  references customers(customer_id)
+customer_id int not null,
+city varchar(20) not null,
+state varchar(20) not null,
+country varchar(20) not null,
+postal_code varchar(20) not null
 );
 
 ALTER TABLE addresses AUTO_INCREMENT = 100;
 
 CREATE TABLE categories(
 category_id int primary key auto_increment,
-category_name varchar(25)
+category_name varchar(25) not null
 );
 
 alter table categories auto_increment = 100;
 
 create table suppliers(
 supplier_id int primary key auto_increment,
-supplier_name varchar(30),
-contact_email varchar(50)
+supplier_name varchar(30) not null ,
+contact_email varchar(50) UNIQUE NOT NULL
 );
 
 alter table suppliers auto_increment = 100;
 
 create table products(
 product_id int primary key auto_increment,
-category_id int,
-supplier_id int,
-product_name varchar(30),
-price decimal(10,2),
-stock_quantity int,
-created_at datetime,
-Foreign key (category_id) references categories(category_id),
-foreign key(supplier_id) references suppliers(supplier_id)
+category_id int not null,
+supplier_id int not null
+product_name varchar(30) not null,
+price decimal(10,2) not null,
+stock_quantity int not null,
+created_at datetime default now() not null,
 );
 
 alter table products auto_increment = 100;
 
 create table orders(
-order_id int primary key auto_increment,
-customer_id int,
-orderdate datetime,
-status enum("pending","shipped","delivered"),
-total_amount decimal(10,2),
-foreign key (customer_id) references customers(customer_id)
+order_id int primary key auto_increment not null,
+customer_id int not null,
+orderdate datetime default now() not null,
+status enum("pending","shipped","delivered","cancelled","returned") not null,
+total_amount decimal(10,2) not null,
 );
 
 alter table orders auto_increment = 100;
 
 create table order_items(
 	order_item_id int primary key auto_increment,
-	order_id int,
-	product_id int,
-	quantity int,
-	price_per_unit decimal(10,2),
-	foreign key (order_id) references orders(order_id),
-	foreign key (product_id) references products(product_id)
+	order_id int not null,
+	product_id int not null,
+	quantity int not null,
+	price_per_unit decimal(10,2) not null
 );
 
 alter table order_items auto_increment = 100;
 
 create table payments(
 payment_id int primary key auto_increment,
-order_id int,
+order_id int not null,
 payment_method ENUM('upi', 'card_debit', 'card_credit', 'net_banking', 'wallet_paytm', 'wallet_phonepe', 'emi', 'bnpl', 'cod', 'neft', 'rtgs', 'cheque'),
-payment_status ENUM('pending', 'authorized', 'paid', 'failed', 'refunded'),
-payment_date datetime,
-amount decimal(10,2),
-foreign key (order_id) references orders(order_id)
+payment_status ENUM('pending', 'authorized', 'paid', 'failed', 'refunded') not null,
+payment_date datetime default now() not null
+amount decimal(10,2) not null,
 );
 
 alter table payments auto_increment = 100;
