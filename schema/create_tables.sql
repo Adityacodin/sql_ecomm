@@ -6,8 +6,8 @@ CREATE TABLE customers(
 	customer_id int primary key auto_increment,
 	first_name varchar(25) not null,
 	last_name varchar(25) not null,
-	email varchar(50) not null UNIQUE,
-	phone varchar(15) not null UNIQUE ,
+	email varchar(50) UNIQUE NOT NULL,
+	phone varchar(15) UNIQUE NOT NULL,
 	created_at DATETIME DEFAULT NOW() not null
 );
 
@@ -81,6 +81,3 @@ amount decimal(10,2) not null,
 );
 
 alter table payments auto_increment = 100;
-
-
-
