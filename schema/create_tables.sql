@@ -42,11 +42,11 @@ alter table suppliers auto_increment = 100;
 create table products(
 product_id int primary key auto_increment,
 category_id int not null,
-supplier_id int not null
+supplier_id int not null,
 product_name varchar(30) not null,
 price decimal(10,2) not null,
 stock_quantity int not null,
-created_at datetime default now() not null,
+created_at datetime default now() not null
 );
 
 alter table products auto_increment = 100;
@@ -56,7 +56,7 @@ order_id int primary key auto_increment not null,
 customer_id int not null,
 orderdate datetime default now() not null,
 status enum("pending","shipped","delivered","cancelled","returned") not null,
-total_amount decimal(10,2) not null,
+total_amount decimal(10,2) not null
 );
 
 alter table orders auto_increment = 100;
@@ -76,8 +76,8 @@ payment_id int primary key auto_increment,
 order_id int not null,
 payment_method ENUM('upi', 'card_debit', 'card_credit', 'net_banking', 'wallet_paytm', 'wallet_phonepe', 'emi', 'bnpl', 'cod', 'neft', 'rtgs', 'cheque'),
 payment_status ENUM('pending', 'authorized', 'paid', 'failed', 'refunded') not null,
-payment_date datetime default now() not null
-amount decimal(10,2) not null,
+payment_date datetime default now() not null,
+amount decimal(10,2) not null
 );
 
 alter table payments auto_increment = 100;
