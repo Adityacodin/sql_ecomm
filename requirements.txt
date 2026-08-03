@@ -1,0 +1,6 @@
+dotenv==0.9.9
+Faker==40.19.1
+faker-commerce==1.0.4
+mariadb==1.1.14
+packaging==26.2
+python-dotenv==1.2.2
